@@ -3,6 +3,8 @@ import logging
 import matplotlib.pyplot as plt
 import contextily as ctx
 from iteration_utilities import duplicates
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 from shapely.geometry import Point, LineString, box
 
 logging.basicConfig(format='%(asctime)s [%(levelname)s]: %(message)s')
@@ -18,12 +20,14 @@ logger.setLevel(logging.DEBUG) # 0: Not set, 10: DEBUG, 20: INFO, 30: WARNING, 4
 world = gpd.read_file("data/ne_50m_admin_0_countries.shp")
 # how detailed map to save, larger number - more details
 basemap_zoom = 7
+# line width
+line_width = 2
 # size of the city marker
-marker_size = 3
+marker_size = 10
+marker_style = 'o'
 
 # how much shift lat for repeated cities
-lat_shift = 0.1
-
+lat_shift = 0.15
 
 # Define a bounding box for Europe in EPSG:4326 (lon/lat)
 #  "minx": -25,   # westernmost (e.g., Portugal/Iceland)
@@ -65,13 +69,13 @@ ai4eosc = {
                       'Bratislava': (17.1077, 48.1486)
                     },
     'line':   { 'color': 'darkcyan',
-                'width': 1.2,
+                'width': line_width,
                 'style': '-',
                 'alpha': 0.5
               },
     'marker': { 'color': 'deeppink',
-                'size': marker_size,
-                'style': '*',
+                'size' : marker_size,
+                'style': marker_style,
                 'alpha': 0.5
               },
 }
@@ -85,13 +89,13 @@ imagine_ai = {
                       'Bratislava': (17.1077, 48.1486)
                     },
     'line':   { 'color': 'darkblue',
-                'width': 1.2,
+                'width': line_width,
                 'style': '-',
                 'alpha': 0.5
               },
     'marker': { 'color': 'orange',
-                'size': marker_size,
-                'style': '*',
+                'size' : marker_size,
+                'style': marker_style,
                 'alpha': 0.5
               },
 }
@@ -169,9 +173,15 @@ def draw_connections(project):
     city_gdf.plot(ax=ax, color=marker['color'], markersize=marker['size'], zorder=3, alpha=marker['alpha'])
 
 
+legend_elements = []
+for eup in eu_projects:
+    legend_elements.append(
+        plt.Line2D([0], [0], marker=eup['marker']['style'], color=eup['line']['color'], label=eup['name'],
+                   markerfacecolor=eup['marker']['color'], markersize=marker_size)
+    )
+
 # Plotting
 fig, ax = plt.subplots(figsize=(12, 12), dpi=200) # Bigger figure and higher DPI
-
 
 # Clip the world data according to bbox for Europe
 countries = countries.to_crs(epsg=4326)
@@ -210,18 +220,14 @@ for x, y, label in zip(cities_gdf.geometry.x, cities_gdf.geometry.y, cities_gdf[
 
 logger.info("Added project cities")
 
-#for x, y, label in zip(city_gdf.geometry.x, city_gdf.geometry.y, city_gdf['name']):
-#    ax.text(x + 5000, y + 5000, label, fontsize=12, fontweight='bold', 
-#            ha='center', va='center', color='black', 
-#            bbox=dict(facecolor='white', alpha=0.5, edgecolor='none', boxstyle="round,pad=0.3"))
-
-# Add OpenStreetMap basemap at a higher zoom level
+# Add OpenStreetMap basemap at a higher zoom level 
+# options: OpenStreetMap.Mapnik (default), CartoDB.Positron
 ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, zoom=basemap_zoom)
-#ctx.add_basemap(ax, source=ctx.providers.CartoDB.Positron, zoom=4)
 
 plt.title("EU projects connections")
 plt.axis('off')
 plt.tight_layout()
+ax.legend(handles=legend_elements, loc='lower left', fontsize=10)
 plt.savefig("map_high_res.pdf", dpi=600, bbox_inches='tight')  # 300+ DPI = print quality
 logger.info("Saved PDF")
 plt.savefig("map_high_res.jpg", dpi=300, bbox_inches='tight')  # 300+ DPI = print quality
