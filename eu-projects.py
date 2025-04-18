@@ -2,6 +2,7 @@ import geopandas as gpd
 import logging
 import matplotlib.pyplot as plt
 import contextily as ctx
+from iteration_utilities import duplicates
 from shapely.geometry import Point, LineString, box
 
 logging.basicConfig(format='%(asctime)s [%(levelname)s]: %(message)s')
@@ -15,6 +16,14 @@ logger.setLevel(logging.DEBUG) # 0: Not set, 10: DEBUG, 20: INFO, 30: WARNING, 4
 
 # Load world map data
 world = gpd.read_file("data/ne_50m_admin_0_countries.shp")
+# how detailed map to save, larger number - more details
+basemap_zoom = 7
+# size of the city marker
+marker_size = 3
+
+# how much shift lat for repeated cities
+lat_shift = 0.1
+
 
 # Define a bounding box for Europe in EPSG:4326 (lon/lat)
 #  "minx": -25,   # westernmost (e.g., Portugal/Iceland)
@@ -61,20 +70,19 @@ ai4eosc = {
                 'alpha': 0.5
               },
     'marker': { 'color': 'deeppink',
-                'size': 2,
+                'size': marker_size,
                 'style': '*',
                 'alpha': 0.5
               },
 }
 
 # Define iMagine-AI destination cities
-shift_same_city=0.26
 imagine_ai = {
     'name': 'iMagine',
-    'destinations': { 'Valencia': (-0.3763, 39.4699+shift_same_city),
-                      'Santander': (-3.8044, 43.4623+shift_same_city),
-                      'Lisboa': (-9.1393, 38.7223+shift_same_city),
-                      'Bratislava': (17.1077, 48.1486+shift_same_city)
+    'destinations': { 'Valencia': (-0.3763, 39.4699),
+                      'Santander': (-3.8044, 43.4623),
+                      'Lisboa': (-9.1393, 38.7223),
+                      'Bratislava': (17.1077, 48.1486)
                     },
     'line':   { 'color': 'darkblue',
                 'width': 1.2,
@@ -82,19 +90,53 @@ imagine_ai = {
                 'alpha': 0.5
               },
     'marker': { 'color': 'orange',
-                'size': 2,
+                'size': marker_size,
                 'style': '*',
                 'alpha': 0.5
               },
 }
 
+eu_projects = [ai4eosc, imagine_ai]
+n_projects = len(eu_projects)
+
+# Get list of all cities and their coordinates
+city_keys = []
+cities = {}
+for eup in eu_projects:
+    city_keys += list(eup['destinations'].keys())
+    cities = { **cities, **eup['destinations']}
+
+# Find repeated cities, copy their coordinates
+repeated_city_keys = list(duplicates(city_keys))
+repeated_cities = {ckey: cvalue for ckey, cvalue in cities.items() if ckey in repeated_city_keys}
+logger.debug(city_keys)
+logger.debug(cities)
+logger.debug(repeated_city_keys)
+logger.debug(repeated_cities)
+
+# Identify repeated city in the project, apply shift for better visualisation
+for eup in eu_projects:
+    for ckey, cvalue in eup['destinations'].items():
+        if ckey in repeated_city_keys:
+            lat = repeated_cities[ckey][1]
+            eup['destinations'][ckey] = (cvalue[0], lat)
+            repeated_cities[ckey] = (cvalue[0], lat + lat_shift)
+
+# Shift Karlsruhe position for every project for better visibility
+eup_i = 0
+for eup in eu_projects:
+    karlsruhe_coords_shift = (karlsruhe_coords[0],
+                              karlsruhe_coords[1] + lat_shift*(eup_i - (n_projects - 1)/2))
+    eup['destinations']['Karlsruhe'] = karlsruhe_coords_shift
+    eup_i += 1
+    logger.debug(eup)
 
 # Create GeoDataFrame for cities
 def city_geo(destinations):
     city_data = {
-        'name': ['Karlsruhe'] + list(destinations.keys()),
-        'lon': [karlsruhe_coords[0]] + [lon for lon, lat in destinations.values()],
-        'lat': [karlsruhe_coords[1]] + [lat for lon, lat in destinations.values()],
+        'name': list(destinations.keys()),
+        'lon': [lon for lon, lat in destinations.values()],
+        'lat': [lat for lon, lat in destinations.values()],
     }
     city_gdf = gpd.GeoDataFrame(
         city_data,
@@ -106,7 +148,7 @@ def city_geo(destinations):
 # Create lines from Karlsruhe to each destination
 def lines_geo(destinations):
     lines = [
-        LineString([Point(karlsruhe_coords), Point(coord)])
+        LineString([Point(destinations['Karlsruhe']), Point(coord)])
         for coord in destinations.values()
     ]
     line_gdf = gpd.GeoDataFrame(geometry=lines, crs="EPSG:4326")
@@ -148,11 +190,9 @@ logger.info("Reprojected Europe")
 countries.boundary.plot(ax=ax, color='dimgray', linewidth=0.5, linestyle='--', antialiased=True, alpha=0.7)
 logger.info("Added country borders")
 
-draw_connections(imagine_ai)
-logger.info("Added project: iMagine AI")
-
-draw_connections(ai4eosc)
-logger.info("Added project: AI4EOSC")
+for eup in eu_projects:
+    draw_connections(eup)
+    logger.info(f"Added project: {eup['name']}")
 
 # Plot city names (we combine cities from all projects, because there can be duplicates otherwise)
 cities = {  **imagine_ai['destinations'],
@@ -160,10 +200,13 @@ cities = {  **imagine_ai['destinations'],
          }
 logger.debug(cities)
 
+# Show only Karlsruhe
+#cities_gdf = city_geo({'Karlsruhe': karlsruhe_coords})
+# Show all cities
 cities_gdf = city_geo(cities)
 cities_gdf = cities_gdf.to_crs(epsg=3857)
 for x, y, label in zip(cities_gdf.geometry.x, cities_gdf.geometry.y, cities_gdf['name']):
-    ax.text(x + 10000, y + 10000, label, fontsize=4)
+    ax.text(x + 10000, y + 10000, label, fontsize=6)
 
 logger.info("Added project cities")
 
@@ -173,7 +216,7 @@ logger.info("Added project cities")
 #            bbox=dict(facecolor='white', alpha=0.5, edgecolor='none', boxstyle="round,pad=0.3"))
 
 # Add OpenStreetMap basemap at a higher zoom level
-ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, zoom=7)
+ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, zoom=basemap_zoom)
 #ctx.add_basemap(ax, source=ctx.providers.CartoDB.Positron, zoom=4)
 
 plt.title("EU projects connections")
