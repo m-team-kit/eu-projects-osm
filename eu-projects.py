@@ -1,11 +1,13 @@
+import config as cfg
 import geopandas as gpd
 import logging
 import matplotlib.pyplot as plt
 import contextily as ctx
+from config import eu_projects, karlsruhe_coords, lat_shift
 from iteration_utilities import duplicates
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
-from shapely.geometry import Point, LineString, box
+from shapely.geometry import Point, LineString
 
 logging.basicConfig(format='%(asctime)s [%(levelname)s]: %(message)s')
 logger = logging.getLogger(__name__)
@@ -15,34 +17,6 @@ logger.setLevel(logging.DEBUG) # 0: Not set, 10: DEBUG, 20: INFO, 30: WARNING, 4
 #ch = logging.StreamHandler()
 #ch.setLevel(logging.DEBUG)
 #logger.addHandler(ch)
-
-# Load world map data
-world = gpd.read_file("data/ne_50m_admin_0_countries.shp")
-# how detailed map to save, larger number - more details
-basemap_zoom = 7
-# line width
-line_width = 2
-# size of the city marker
-marker_size = 10
-marker_style = 'o'
-
-# how much shift lat for repeated cities
-lat_shift = 0.15
-
-# Define a bounding box for Europe in EPSG:4326 (lon/lat)
-#  "minx": -25,   # westernmost (e.g., Portugal/Iceland)
-#  "maxx": 45,    # easternmost (e.g., Slovakia/Ukraine)
-#  "miny": 34,    # southernmost (e.g., Mediterranean)
-#  "maxy": 72     # northernmost (e.g., Scandinavia)
-#  box(minx, miny, maxx, maxy)
-europe_bbox = box(-25, 32, 40, 60)
-
-# Filter for countries you want to show (e.g., in Europe)
-countries = world[world['NAME'].isin(['Spain', 'Germany', 'France', 
-                                      'Italy', 'Belgium', 'Netherlands', 
-                                      'Poland', 'Portugal', 'Slovakia',
-                                      'Ireland', 'Turkey', 'Denmark',
-                                      'Norway', 'Sweden', 'United Kingdom'])]
 
 #import folium
 #
@@ -55,52 +29,6 @@ countries = world[world['NAME'].isin(['Spain', 'Germany', 'France',
 ## Save to HTML and view in the browser (vector tiles for sharpness)
 #m.save("high_res_map.html")
 
-# Define Karlsruhe (the hub)
-karlsruhe_coords = (8.4037, 49.0069)  # lon, lat
-
-# Define AI4EOSC destination cities
-ai4eosc = {
-    'name': 'AI4EOSC',
-    'destinations': { 'Valencia': (-0.3763, 39.4699),
-                      'Santander': (-3.8044, 43.4623),
-                      'Lisboa': (-9.1393, 38.7223),
-                      'Bologne': (11.3426, 44.4949),
-                      'Poznan': (16.9252, 52.4064),
-                      'Bratislava': (17.1077, 48.1486)
-                    },
-    'line':   { 'color': 'darkcyan',
-                'width': line_width,
-                'style': '-',
-                'alpha': 0.5
-              },
-    'marker': { 'color': 'deeppink',
-                'size' : marker_size,
-                'style': marker_style,
-                'alpha': 0.5
-              },
-}
-
-# Define iMagine-AI destination cities
-imagine_ai = {
-    'name': 'iMagine',
-    'destinations': { 'Valencia': (-0.3763, 39.4699),
-                      'Santander': (-3.8044, 43.4623),
-                      'Lisboa': (-9.1393, 38.7223),
-                      'Bratislava': (17.1077, 48.1486)
-                    },
-    'line':   { 'color': 'darkblue',
-                'width': line_width,
-                'style': '-',
-                'alpha': 0.5
-              },
-    'marker': { 'color': 'orange',
-                'size' : marker_size,
-                'style': marker_style,
-                'alpha': 0.5
-              },
-}
-
-eu_projects = [ai4eosc, imagine_ai]
 n_projects = len(eu_projects)
 
 # Get list of all cities and their coordinates
@@ -176,16 +104,18 @@ def draw_connections(project):
 legend_elements = []
 for eup in eu_projects:
     legend_elements.append(
-        plt.Line2D([0], [0], marker=eup['marker']['style'], color=eup['line']['color'], label=eup['name'],
-                   markerfacecolor=eup['marker']['color'], markersize=marker_size)
+        plt.Line2D([0], [0], marker=eup['marker']['style'], color=eup['line']['color'],
+                   alpha=eup['line']['alpha'], label=eup['name'],
+                   markerfacecolor=eup['marker']['color'],
+                   markersize=cfg.legend_marker_size)
     )
 
 # Plotting
 fig, ax = plt.subplots(figsize=(12, 12), dpi=200) # Bigger figure and higher DPI
 
 # Clip the world data according to bbox for Europe
-countries = countries.to_crs(epsg=4326)
-countries = gpd.clip(countries, europe_bbox)
+countries = cfg.countries.to_crs(epsg=4326)
+countries = gpd.clip(countries, cfg.europe_bbox)
 # Reproject only Europe as needed
 countries = countries.to_crs(epsg=3857)
 logger.info("Reprojected Europe")
@@ -204,15 +134,12 @@ for eup in eu_projects:
     draw_connections(eup)
     logger.info(f"Added project: {eup['name']}")
 
-# Plot city names (we combine cities from all projects, because there can be duplicates otherwise)
-cities = {  **imagine_ai['destinations'],
-            **ai4eosc['destinations']
-         }
-logger.debug(cities)
 
-# Show only Karlsruhe
-#cities_gdf = city_geo({'Karlsruhe': karlsruhe_coords})
+# Plot city names (we combine cities from all projects, because there can be duplicates otherwise)
+# Show Karlsruhe
+cities_gdf = city_geo({'Karlsruhe': karlsruhe_coords})
 # Show all cities
+logger.debug(cities)
 cities_gdf = city_geo(cities)
 cities_gdf = cities_gdf.to_crs(epsg=3857)
 for x, y, label in zip(cities_gdf.geometry.x, cities_gdf.geometry.y, cities_gdf['name']):
@@ -222,7 +149,7 @@ logger.info("Added project cities")
 
 # Add OpenStreetMap basemap at a higher zoom level 
 # options: OpenStreetMap.Mapnik (default), CartoDB.Positron
-ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, zoom=basemap_zoom)
+ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, zoom=cfg.basemap_zoom)
 
 plt.title("EU projects connections")
 plt.axis('off')
