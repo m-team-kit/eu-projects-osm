@@ -4,7 +4,7 @@ import logging
 import matplotlib.pyplot as plt
 import contextily as ctx
 from config import eu_projects, karlsruhe_coords, lat_shift
-from iteration_utilities import duplicates
+from iteration_utilities import duplicates, unique_everseen
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from shapely.geometry import Point, LineString
@@ -39,12 +39,15 @@ for eup in eu_projects:
     cities = { **cities, **eup['destinations']}
 
 # Find repeated cities, copy their coordinates
-repeated_city_keys = list(duplicates(city_keys))
+repeated_city_keys = list(unique_everseen(duplicates(city_keys)))
+# Remove Karlsruhe from repeated cities
+repeated_city_keys.remove('Karlsruhe') if 'Karlsruhe' in repeated_city_keys else None
+# Create dictionary with coordinates of repeated cities
 repeated_cities = {ckey: cvalue for ckey, cvalue in cities.items() if ckey in repeated_city_keys}
-logger.debug(city_keys)
-logger.debug(cities)
-logger.debug(repeated_city_keys)
-logger.debug(repeated_cities)
+logger.debug(f"cities in projects: {city_keys}")
+logger.debug(f"city coordinates: {cities}")
+logger.debug(f"repeated_city_keys: {repeated_city_keys}")
+logger.debug(f"repeated_cities: {repeated_cities}")
 
 # Identify repeated city in the project, apply shift for better visualisation
 for eup in eu_projects:
@@ -54,7 +57,7 @@ for eup in eu_projects:
             eup['destinations'][ckey] = (cvalue[0], lat)
             repeated_cities[ckey] = (cvalue[0], lat + lat_shift)
 
-# Shift Karlsruhe position for every project for better visibility
+# Option: Shift Karlsruhe position for every project for better visibility
 eup_i = 0
 for eup in eu_projects:
     karlsruhe_coords_shift = (karlsruhe_coords[0],
@@ -86,7 +89,7 @@ def lines_geo(destinations):
     line_gdf = gpd.GeoDataFrame(geometry=lines, crs="EPSG:4326")
     return line_gdf
 
-# Function to draw lines
+# Function to draw lines between Karlsruhe and project city
 def draw_connections(project):
     city_gdf = city_geo(project['destinations'])
     line_gdf = lines_geo(project['destinations'])
@@ -101,13 +104,15 @@ def draw_connections(project):
     city_gdf.plot(ax=ax, color=marker['color'], markersize=marker['size'], zorder=3, alpha=marker['alpha'])
 
 
+# Create legend for the plot
 legend_elements = []
 for eup in eu_projects:
     legend_elements.append(
-        plt.Line2D([0], [0], marker=eup['marker']['style'], color=eup['line']['color'],
-                   alpha=eup['line']['alpha'], label=eup['name'],
+        plt.Line2D([0], [0], marker=eup['marker']['style'],
                    markerfacecolor=eup['marker']['color'],
-                   markersize=cfg.legend_marker_size)
+                   markersize=cfg.legend_marker_size,
+                   markeredgewidth=0, color=eup['line']['color'],
+                   alpha=eup['line']['alpha'], label=eup['name']),
     )
 
 # Plotting
@@ -154,7 +159,13 @@ ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, zoom=cfg.basemap_
 plt.title("EU projects connections")
 plt.axis('off')
 plt.tight_layout()
-ax.legend(handles=legend_elements, loc='lower left', fontsize=10)
+ax.legend(handles=legend_elements, 
+    ncol=2,
+    numpoints=2,
+    loc=cfg.legend_loc,
+    bbox_to_anchor=cfg.legend_bbox_to_anchor,
+    fontsize=cfg.legend_fontsize
+)
 plt.savefig("map_high_res.pdf", dpi=600, bbox_inches='tight')  # 300+ DPI = print quality
 logger.info("Saved PDF")
 plt.savefig("map_high_res.jpg", dpi=300, bbox_inches='tight')  # 300+ DPI = print quality
