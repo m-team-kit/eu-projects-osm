@@ -25,6 +25,14 @@ lat_shift = 0.15
 # Load world map data
 world = gpd.read_file("data/ne_50m_admin_0_countries.shp")
 
+europe_countries = ['Albania', 'Andora', 'Austria', 'Belgium', 'Bulgraia', 'Croatia', 'Cyprus', 'Czechia',
+                    'Denmark', 'Estonia', 'Finland', 'France', 'Germany', 'Greece',
+                    'Hungary', 'Iceland', 'Ireland', 'Italy', 'Latvia', 'Liechtenstein', 'Lithuania', 'Luxembourg',
+                    'Malta', 'Monaco', 'Netherlands', 'Norway', 'Poland', 'Portugal', 'Romania', 'San Marino', 
+                    'Slovakia', 'Slovenia', 'Spain', 'Sweden', 'Switzerland', 'United Kingdom']
+
+europe = world[world['NAME'].isin(europe_countries)]
+
 # Filter for countries you want to show (e.g., in Europe)
 countries = world[world['NAME'].isin(['Spain', 'Germany', 'France', 
                                       'Italy', 'Belgium', 'Netherlands', 
@@ -59,7 +67,7 @@ ai4eosc = init_project('AI4EOSC')
 ai4eosc['destinations'].update({ 
     'Valencia': (-0.3763, 39.4699),
     'Santander': (-3.8044, 43.4623),
-    'Lisboa': (-9.1393, 38.7223),
+    'Lisbon': (-9.1393, 38.7223),
     'Bologne': (11.3426, 44.4949),
     'Poznan': (16.9252, 52.4064),
     'Bratislava': (17.1077, 48.1486)
@@ -70,10 +78,25 @@ ai4eosc['marker']['color'] = 'deeppink'
 # Define iMagine-AI destination cities
 imagine_ai = init_project('iMagine')
 imagine_ai['destinations'].update({
-    'Valencia': (-0.3763, 39.4699),
+    'Amsterdam': (4.9041, 52.3676),
+    'Ankara': (32.8541, 39.9208),
+    'Lecce': (18.1743, 40.3529),
     'Santander': (-3.8044, 43.4623),
-    'Lisboa': (-9.1393, 38.7223),
-    'Bratislava': (17.1077, 48.1486)
+    'Oldenburg': (8.2146, 53.1435),
+    #'Bremen': (8.8017, 53.0793),
+    'Brest': (-4.4861, 48.3904),
+    'Galway': (-9.0568, 53.2707),
+    'Barcelona': (2.1734, 41.3851),
+    'Bratislava': (17.1077, 48.1486),
+    'Lisbon': (-9.1399, 38.7169),
+    'Nootdorp': (4.4111, 52.0447),
+    'Trieste': (13.7768, 45.6495),
+    'Valencia': (-0.3763, 39.4699),
+    'Palma de Mallorca': (2.6502, 39.5696),
+    'Paris': (2.3522, 48.8566),
+    'Metz': (6.1757, 49.1193),
+    'Oostende': (2.9200, 51.2300),
+    'Waterford': (-7.1101, 52.2593),
 })
 imagine_ai['line']['color'] = 'darkblue'
 imagine_ai['marker']['color'] = 'orange'

@@ -59,12 +59,12 @@ for eup in eu_projects:
 
 # Option: Shift Karlsruhe position for every project for better visibility
 eup_i = 0
-for eup in eu_projects:
-    karlsruhe_coords_shift = (karlsruhe_coords[0],
-                              karlsruhe_coords[1] + lat_shift*(eup_i - (n_projects - 1)/2))
-    eup['destinations']['Karlsruhe'] = karlsruhe_coords_shift
-    eup_i += 1
-    logger.debug(eup)
+#for eup in eu_projects:
+#    karlsruhe_coords_shift = (karlsruhe_coords[0],
+#                              karlsruhe_coords[1] + lat_shift*(eup_i - (n_projects - 1)/2))
+#    eup['destinations']['Karlsruhe'] = karlsruhe_coords_shift
+#    eup_i += 1
+#    logger.debug(eup)
 
 # Create GeoDataFrame for cities
 def city_geo(destinations):
